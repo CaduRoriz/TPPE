@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  backend_k:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=app_db
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "user", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  tests:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.test
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+    command: ["pytest", "tests/"]
+
+volumes:
+  mysql_data: 
