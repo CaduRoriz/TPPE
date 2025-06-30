@@ -7,7 +7,17 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
-
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=mysql+pymysql://user:password@db:3306/app_db
+      - MYSQL_HOST=db
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+      - MYSQL_DATABASE=app_db
+    restart: unless-stopped
+    
   db:
     image: mysql:8.0
     environment:
@@ -16,14 +26,16 @@ services:
       - MYSQL_USER=user
       - MYSQL_PASSWORD=password
     ports:
-      - "3307:3306"
+      - "13307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "user", "-ppassword"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
   tests:
     build:
@@ -34,6 +46,7 @@ services:
     volumes:
       - ./backend:/app
     command: ["pytest", "tests/"]
+    profiles: ["test"]
 
 volumes:
-  mysql_data: 
+  mysql_data:

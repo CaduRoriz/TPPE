@@ -1,11 +1,22 @@
 FROM python:3.9-slim
 
+# Instalar mysql-client para o mysqladmin
+RUN apt-get update && apt-get install -y \
+    default-mysql-client \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install pytest
+RUN pip install pytest pytest-asyncio httpx
 
 COPY . .
 
-CMD ["pytest", "tests/"]
+# Definir variáveis de ambiente para os testes
+ENV MYSQL_HOST=db
+ENV MYSQL_USER=user
+ENV MYSQL_PASSWORD=password
+ENV DATABASE_URL=mysql+pymysql://user:password@db:3306/app_db
+
+CMD ["pytest", "tests/", "-v", "--tb=short"]
