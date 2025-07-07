@@ -44,7 +44,8 @@ def populate_sample_data():
     """Popula o banco de dados com dados fictícios"""
     try:
         logger.info("Iniciando população de dados fictícios...")
-          # Criar sessão do banco
+        
+        # Criar sessão do banco
         db = next(get_db())
         
         # Verificar se já existem dados
@@ -240,7 +241,7 @@ def populate_sample_data():
                 data_entrada=datetime.now().date() - timedelta(days=2)
             )
         ]
-          for internacao in internacoes:
+        for internacao in internacoes:
             db.add(internacao)
         db.commit()
         
@@ -266,7 +267,8 @@ def populate_sample_data():
                 hospital_id=3
             )
         ]
-          for farmacia in farmacias:
+        
+        for farmacia in farmacias:
             db.add(farmacia)
         db.commit()
         

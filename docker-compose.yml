@@ -42,11 +42,20 @@ services:
       context: ./backend
       dockerfile: Dockerfile.test
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      backend_k:
+        condition: service_started
     volumes:
       - ./backend:/app
-    command: ["pytest", "tests/"]
-    profiles: ["test"]
+    environment:
+      - DATABASE_URL=mysql+pymysql://user:password@db:3306/app_db
+      - MYSQL_HOST=db
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+      - MYSQL_DATABASE=app_db
+    command: ["pytest", "tests/", "-v", "--tb=short"]
+    restart: "no"
 
 volumes:
   mysql_data:

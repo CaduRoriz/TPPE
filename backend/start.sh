@@ -14,6 +14,10 @@ echo "Banco de dados disponível!"
 echo "Inicializando tabelas do banco de dados..."
 python /app/init_db.py
 
+# Executa os testes (opcional - descomente se quiser)
+echo "Executando testes..."
+python -m pytest /app/tests/ -v --tb=short || echo "⚠️ Alguns testes falharam, mas a aplicação continuará"
+
 # Inicia a aplicação
 echo "Iniciando aplicação FastAPI..."
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
