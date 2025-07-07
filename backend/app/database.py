@@ -25,7 +25,12 @@ def create_db_engine():
                 pool_pre_ping=True,  # Verifica conexões antes de usar
                 pool_recycle=3600,   # Recicla conexões após 1 hora
                 pool_size=10,        # Número de conexões no pool
-                max_overflow=20      # Máximo de conexões extras
+                max_overflow=20,     # Máximo de conexões extras
+                # Configurações específicas para MySQL
+                connect_args={
+                    "charset": "utf8mb4",
+                    "use_unicode": True
+                }
             )
             
             # Testa a conexão
@@ -58,12 +63,15 @@ Base = declarative_base()
 
 def get_db():
     """Dependency que fornece uma sessão do banco de dados"""
-    db = SessionLocal()
+    db = None
     try:
+        db = SessionLocal()
         yield db
     except Exception as e:
         logger.error(f"Erro na sessão do banco: {e}")
-        db.rollback()
+        if db:
+            db.rollback()
         raise
     finally:
-        db.close() 
+        if db:
+            db.close() 

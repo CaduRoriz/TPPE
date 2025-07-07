@@ -1,7 +1,22 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime, Date, Float
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime, Date, Float, Table
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from ..database import Base
+
+# Tabela de associação para relacionamento many-to-many entre PrescricaoMedica e Medicamento
+prescricao_medicamentos = Table(
+    'prescricao_medicamentos',
+    Base.metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),  # Adicionando ID próprio
+    Column('prescricao_id', Integer, ForeignKey('prescricoes_medicas.id', ondelete='CASCADE'), nullable=False),
+    Column('medicamento_id', Integer, ForeignKey('medicamentos.id', ondelete='CASCADE'), nullable=False),
+    Column('dosagem', String(100), nullable=False),
+    Column('frequencia', String(100), nullable=False),
+    Column('duracao', String(50), nullable=True),
+    Column('observacoes', String(500), nullable=True),
+    # Adicionar índice único para evitar duplicatas
+    # UniqueConstraint('prescricao_id', 'medicamento_id', name='uq_prescricao_medicamento')
+)
 
 class Paciente(Base):
     __tablename__ = "pacientes"
@@ -35,24 +50,7 @@ class PrescricaoMedica(Base):
     # Relacionamentos
     paciente = relationship("Paciente", back_populates="prescricoes")
     medico = relationship("Medico", back_populates="prescricoes")
-    itens = relationship("ItemPrescricao", back_populates="prescricao")
-
-
-class ItemPrescricao(Base):
-    __tablename__ = "itens_prescricao"
-
-    id = Column(Integer, primary_key=True, index=True)
-    prescricao_id = Column(Integer, ForeignKey("prescricoes_medicas.id"), nullable=False)
-    medicamento = Column(String(200), nullable=False)
-    dosagem = Column(String(100), nullable=False)
-    frequencia = Column(String(100), nullable=False)
-    duracao = Column(String(50), nullable=True)
-    observacoes = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # Relacionamento
-    prescricao = relationship("PrescricaoMedica", back_populates="itens")
+    medicamentos = relationship("Medicamento", secondary=prescricao_medicamentos, back_populates="prescricoes")
 
 
 class Medico(Base):
@@ -136,8 +134,9 @@ class Medicamento(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Relacionamento
+    # Relacionamentos
     farmacia = relationship("Farmacia", back_populates="medicamentos")
+    prescricoes = relationship("PrescricaoMedica", secondary=prescricao_medicamentos, back_populates="medicamentos")
 
 
 class ContaHospitalar(Base):

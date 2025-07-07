@@ -93,27 +93,7 @@ class Internacao(InternacaoBase):
     class Config:
         from_attributes = True
 
-# Schemas para ItemPrescricao
-class ItemPrescricaoBase(BaseModel):
-    medicamento: str
-    dosagem: str
-    frequencia: str
-    duracao: Optional[str] = None
-    observacoes: Optional[str] = None
-
-class ItemPrescricaoCreate(ItemPrescricaoBase):
-    prescricao_id: int
-
-class ItemPrescricao(ItemPrescricaoBase):
-    id: int
-    prescricao_id: int
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    
-    class Config:
-        from_attributes = True
-
-# Schemas para PrescricaoMedica
+# Schemas para PrescricaoMedica  
 class PrescricaoMedicaBase(BaseModel):
     data: date
     observacoes_clinicas: Optional[str] = None
@@ -121,13 +101,23 @@ class PrescricaoMedicaBase(BaseModel):
     medico_id: int
 
 class PrescricaoMedicaCreate(PrescricaoMedicaBase):
-    pass
+    medicamentos_ids: List[int] = []  # Lista de IDs dos medicamentos
+
+class MedicamentoPrescricao(BaseModel):
+    """Schema para medicamento dentro de uma prescrição"""
+    id: int
+    nome: str
+    principio_ativo: str
+    dosagem: Optional[str] = None
+    frequencia: Optional[str] = None
+    duracao: Optional[str] = None
+    observacoes: Optional[str] = None
 
 class PrescricaoMedica(PrescricaoMedicaBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
-    itens: List[ItemPrescricao] = []
+    medicamentos: List[MedicamentoPrescricao] = []
     
     class Config:
         from_attributes = True

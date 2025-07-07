@@ -366,7 +366,7 @@ def init_db():
             "quartos",
             "internacoes",
             "prescricoes_medicas",
-            "itens_prescricao",
+            "prescricao_medicamentos",
             "farmacias",
             "medicamentos",
             "contas_hospitalares"
@@ -388,12 +388,20 @@ def init_db():
         missing_tables = set(tables_to_create) - set(existing_tables)
         if missing_tables:
             logger.warning(f"Tabelas não criadas: {', '.join(missing_tables)}")
-            return False
+            # Não falha completamente, continua mesmo com tabelas faltando
+            logger.info("Continuando com as tabelas disponíveis...")
         else:
             logger.info("✅ Todas as tabelas foram criadas com sucesso!")
             
-        # Inserir dados fictícios
-        return populate_sample_data()
+        # Inserir dados fictícios apenas se temos pelo menos algumas tabelas essenciais
+        essential_tables = ["hospitais", "pacientes", "medicos"]
+        has_essential_tables = all(table in existing_tables for table in essential_tables)
+        
+        if has_essential_tables:
+            return populate_sample_data()
+        else:
+            logger.error("❌ Tabelas essenciais não foram criadas. Não é possível continuar.")
+            return False
             
     except Exception as e:
         logger.error(f"❌ Erro ao criar tabelas: {e}")

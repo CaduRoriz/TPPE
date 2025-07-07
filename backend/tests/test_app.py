@@ -43,7 +43,8 @@ def test_db():
 @pytest.fixture
 def client(test_db):
     """Fixture do cliente de teste"""
-    return TestClient(app)
+    with TestClient(app) as test_client:
+        yield test_client
 
 @pytest.fixture
 def sample_hospital_data():
@@ -347,11 +348,10 @@ class TestIntegrationTests:
         }
         client.post("/pacientes/", json=paciente_data)
         
-        # Tentar deletar hospital (deveria falhar em um sistema real com constraints)
+        # Tentar deletar hospital (deveria falhar com constraint)
         response = client.delete(f"/hospitais/{hospital_id}")
-        # Como não temos constraints implementadas, isso passará
-        # Em um projeto real, deveria retornar erro
-        assert response.status_code in [200, 400, 409]
+        assert response.status_code == 400
+        assert "pacientes vinculados" in response.json()["detail"]
 
 # ========== TESTES UNITÁRIOS ==========
 
@@ -447,7 +447,12 @@ class TestErrorHandling:
 
     def test_database_connection_failure(self, client):
         """Teste de falha na conexão com banco"""
-        with patch('app.database.get_db') as mock_db:
-            mock_db.side_effect = Exception("Database connection failed")
+        # Vamos simular falha na execução da query
+        with patch('sqlalchemy.engine.base.Connection.execute') as mock_execute:
+            mock_execute.side_effect = Exception("Database connection failed")
             response = client.get("/health")
-            assert response.status_code == 503
+            # Como o endpoint trata graciosamente as falhas, verifica o status
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "degraded"
+            assert data["database"] == "disconnected"

@@ -17,30 +17,48 @@ async def startup():
     try:
         # Criar todas as tabelas no banco de dados
         Base.metadata.create_all(bind=engine)
-        logger.info("Database tables created successfully")
+        logger.info("✅ Database tables created successfully")
     except Exception as e:
-        logger.error(f"Failed to create database tables: {e}")
-        logger.warning("Application will continue without database connection")
+        logger.error(f"❌ Failed to create database tables: {e}")
+        logger.warning("⚠️ Application will continue without database connection")
+        # Não para a aplicação, apenas registra o erro
 
 @app.get("/")
 async def root():
     return {"message": "Hospital Management System API", "status": "running"}
 
 @app.get("/health")
-async def health_check(db: Session = Depends(get_db)):
+async def health_check():
     """Endpoint para verificar a saúde da aplicação e conexão com o banco"""
     try:
-        # Testa a conexão com o banco
-        from sqlalchemy import text
-        db.execute(text("SELECT 1"))
+        # Tenta obter uma sessão do banco
+        db = next(get_db())
+        try:
+            # Testa a conexão com o banco
+            from sqlalchemy import text
+            db.execute(text("SELECT 1"))
+            db_status = "connected"
+            status = "healthy"
+        except Exception as db_error:
+            logger.warning(f"Database connection issue: {db_error}")
+            db_status = "disconnected"
+            status = "degraded"
+        finally:
+            db.close()
+            
         return {
-            "status": "healthy",
-            "database": "connected",
-            "message": "Sistema funcionando corretamente"
+            "status": status,
+            "database": db_status,
+            "message": "Sistema funcionando corretamente" if status == "healthy" else "Sistema com problemas de banco de dados"
         }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        raise HTTPException(status_code=503, detail="Database connection failed")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail={
+            "status": "unhealthy",
+            "database": "error",
+            "message": f"Erro no sistema: {str(e)}"
+        })
 
 # ========== HOSPITAL ENDPOINTS =========
 @app.post("/hospitais/", response_model=schemas.Hospital)
@@ -91,6 +109,21 @@ def delete_hospital(hospital_id: int, db: Session = Depends(get_db)):
     db_hospital = db.query(models.Hospital).filter(models.Hospital.id == hospital_id).first()
     if db_hospital is None:
         raise HTTPException(status_code=404, detail="Hospital não encontrado")
+    
+    # Verificar se há pacientes vinculados ao hospital
+    pacientes_count = db.query(models.Paciente).filter(models.Paciente.hospital_id == hospital_id).count()
+    if pacientes_count > 0:
+        raise HTTPException(status_code=400, detail=f"Não é possível deletar hospital com {pacientes_count} pacientes vinculados")
+    
+    # Verificar se há médicos vinculados ao hospital
+    medicos_count = db.query(models.Medico).filter(models.Medico.hospital_id == hospital_id).count()
+    if medicos_count > 0:
+        raise HTTPException(status_code=400, detail=f"Não é possível deletar hospital com {medicos_count} médicos vinculados")
+    
+    # Verificar se há quartos vinculados ao hospital
+    quartos_count = db.query(models.Quarto).filter(models.Quarto.hospital_id == hospital_id).count()
+    if quartos_count > 0:
+        raise HTTPException(status_code=400, detail=f"Não é possível deletar hospital com {quartos_count} quartos vinculados")
     
     db.delete(db_hospital)
     db.commit()
@@ -351,10 +384,22 @@ def create_prescricao(prescricao: schemas.PrescricaoMedicaCreate, db: Session = 
     if not medico:
         raise HTTPException(status_code=404, detail="Médico não encontrado")
     
-    db_prescricao = models.PrescricaoMedica(**prescricao.dict())
+    # Criar prescrição sem os medicamentos primeiro
+    prescricao_data = prescricao.dict()
+    medicamentos_ids = prescricao_data.pop('medicamentos_ids', [])
+    
+    db_prescricao = models.PrescricaoMedica(**prescricao_data)
     db.add(db_prescricao)
     db.commit()
     db.refresh(db_prescricao)
+    
+    # Adicionar medicamentos à prescrição se fornecidos
+    if medicamentos_ids:
+        medicamentos = db.query(models.Medicamento).filter(models.Medicamento.id.in_(medicamentos_ids)).all()
+        db_prescricao.medicamentos.extend(medicamentos)
+        db.commit()
+        db.refresh(db_prescricao)
+    
     return db_prescricao
 
 @app.get("/prescricoes/", response_model=List[schemas.PrescricaoMedica])
@@ -395,46 +440,6 @@ def delete_prescricao(prescricao_id: int, db: Session = Depends(get_db)):
     db.delete(db_prescricao)
     db.commit()
     return {"message": "Prescrição deletada com sucesso"}
-
-# ========== ITEM PRESCRICAO ENDPOINTS =========
-@app.post("/itens-prescricao/", response_model=schemas.ItemPrescricao)
-def create_item_prescricao(item: schemas.ItemPrescricaoCreate, db: Session = Depends(get_db)):
-    """Criar um novo item de prescrição"""
-    # Verificar se prescrição existe
-    prescricao = db.query(models.PrescricaoMedica).filter(models.PrescricaoMedica.id == item.prescricao_id).first()
-    if not prescricao:
-        raise HTTPException(status_code=404, detail="Prescrição não encontrada")
-    
-    db_item = models.ItemPrescricao(**item.dict())
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    return db_item
-
-@app.get("/itens-prescricao/", response_model=List[schemas.ItemPrescricao])
-def read_itens_prescricao(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """Listar todos os itens de prescrição"""
-    itens = db.query(models.ItemPrescricao).offset(skip).limit(limit).all()
-    return itens
-
-@app.get("/itens-prescricao/{item_id}", response_model=schemas.ItemPrescricao)
-def read_item_prescricao(item_id: int, db: Session = Depends(get_db)):
-    """Obter um item de prescrição específico"""
-    item = db.query(models.ItemPrescricao).filter(models.ItemPrescricao.id == item_id).first()
-    if item is None:
-        raise HTTPException(status_code=404, detail="Item de prescrição não encontrado")
-    return item
-
-@app.delete("/itens-prescricao/{item_id}")
-def delete_item_prescricao(item_id: int, db: Session = Depends(get_db)):
-    """Deletar um item de prescrição"""
-    db_item = db.query(models.ItemPrescricao).filter(models.ItemPrescricao.id == item_id).first()
-    if db_item is None:
-        raise HTTPException(status_code=404, detail="Item de prescrição não encontrado")
-    
-    db.delete(db_item)
-    db.commit()
-    return {"message": "Item de prescrição deletado com sucesso"}
 
 # ========== FARMACIA ENDPOINTS =========
 @app.post("/farmacias/", response_model=schemas.Farmacia)

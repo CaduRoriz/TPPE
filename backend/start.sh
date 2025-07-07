@@ -12,11 +12,11 @@ echo "Banco de dados disponível!"
 
 # Executa o script de inicialização do banco
 echo "Inicializando tabelas do banco de dados..."
-python /app/init_db.py
+python /app/init_db.py || echo "⚠️ Houve problemas na inicialização do banco, mas continuando..."
 
-# Executa os testes (opcional - descomente se quiser)
-echo "Executando testes..."
-python -m pytest /app/tests/ -v --tb=short || echo "⚠️ Alguns testes falharam, mas a aplicação continuará"
+# Não executa testes automaticamente - eles rodam em container separado
+# echo "Executando testes..."
+# python -m pytest /app/tests/ -v --tb=short || echo "⚠️ Alguns testes falharam, mas a aplicação continuará"
 
 # Inicia a aplicação
 echo "Iniciando aplicação FastAPI..."

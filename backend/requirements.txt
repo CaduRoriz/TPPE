@@ -5,3 +5,7 @@ sqlalchemy==2.0.23
 pymysql==1.1.0
 cryptography==41.0.7
 python-multipart==0.0.6
+# Dependências de teste
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
